@@ -1,8 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router';
 import './CardFlip.css';
 import backgroundMusic from '../assets/music_game_3.mp3';
+import { WebsocketSingleton } from "./websocketSingleton";
+
+const socketsingleton: WebsocketSingleton = WebsocketSingleton.instance;
 
 const CardFlip = () => {
+  const { isMultiplayer } = useParams();
   const [images, setImages] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [flippedCards, setFlippedCards] = useState<boolean[]>([]);
@@ -14,7 +19,21 @@ const CardFlip = () => {
   const [isReady, setIsReady] = useState<boolean>(true);
   const [isMuted, setIsMuted] = useState<boolean>(false); // Mute/unmute state
   const [id] = useState<number | null>(Number(localStorage.getItem("ID")));
+  const [gameLost, setGameLost] = useState<boolean>(false);
+  const [gameEnded, setGameEnded] = useState<boolean>(false);
+  const navigate = useNavigate();
 
+  if(isMultiplayer){
+    socketsingleton.socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "game_lost") {
+        console.log("Game lost...");
+        setGameLost(true);
+        setGameEnded(true);
+      } 
+    };
+  }
+  
   const audioRef = useRef<HTMLAudioElement | null>(null); // Reference for the audio element
 
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -173,7 +192,11 @@ const CardFlip = () => {
       setSelectedCards([]);
 
       if (newMatchedCards.every(Boolean)) {
+        if(isMultiplayer){
+          socketsingleton.socket.send(JSON.stringify({ type: "game_won" }));
+        }
         submitScore(moveCount + 1);
+        setGameEnded(true);
       }
     } else {
       setTimeout(() => {
@@ -237,40 +260,60 @@ const CardFlip = () => {
 
   return (
     <div>
-      <h2>Card Flip Game</h2>
+      <div style={{filter: `blur(${gameEnded ? "10px" : "0"})`, pointerEvents: (gameEnded ? "none" : "auto"),
+        userSelect: (gameEnded ? "none" : "auto")
+      }}>
+        <h2>Card Flip Game</h2>
 
-      {error && <div style={{ color: 'red' }}>{error}</div>}
+        {error && <div style={{ color: 'red' }}>{error}</div>}
 
-      <audio ref={audioRef} src={backgroundMusic} loop />
+        <audio ref={audioRef} src={backgroundMusic} loop />
 
-      <div className="score-board">
-        <p>Moves: {moveCount}</p>
-        {highScore !== null && <p>High Score: {highScore}</p>}
-        <button onClick={resetGame}>Restart Game</button>
-      </div>
+        <div className="score-board">
+          <p>Moves: {moveCount}</p>
+          {highScore !== null && <p>High Score: {highScore}</p>}
+          <button onClick={resetGame}>Restart Game</button>
+        </div>
 
-      <div className="grid-container">
-        {images.length > 0 && isReady ? (
-          images.map((imageUrl, index) => (
-            <div
-              key={index}
-              className={`card ${flippedCards[index] || matchedCards[index] ? 'flipped' : ''}`}
-              onClick={() => handleCardClick(index)}
-            >
-              <div className="card-inner">
-                <div className="card-front">
-                  <div className="placeholder"></div>
-                </div>
-                <div className="card-back">
-                  <img src={`/${imageUrl}`} alt={`Image ${index + 1}`} className="grid-image" />
+        <div className="grid-container">
+          {images.length > 0 && isReady ? (
+            images.map((imageUrl, index) => (
+              <div
+                key={index}
+                className={`card ${flippedCards[index] || matchedCards[index] ? 'flipped' : ''}`}
+                onClick={() => handleCardClick(index)}
+              >
+                <div className="card-inner">
+                  <div className="card-front">
+                    <div className="placeholder"></div>
+                  </div>
+                  <div className="card-back">
+                    <img src={`/${imageUrl}`} alt={`Image ${index + 1}`} className="grid-image" />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
-        ) : (
-          <p>Loading images...</p>
-        )}
+            ))
+          ) : (
+            <p>Loading images...</p>
+          )}
+        </div>
       </div>
+      {gameEnded && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'white',
+          padding: '20px',
+          borderRadius: '10px',
+          boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
+          textAlign: 'center'
+        }}>
+          {gameLost ? <h2>You lose</h2> : <h2>You won! 🎉🎉</h2>}
+          <button onClick={() => navigate('/home')}>Back to Home</button>
+        </div>
+      )}
     </div>
   );
 };

@@ -5,6 +5,9 @@ import Keypad from '../assets/Keypad.png';
 import Follow from '../assets/Follow.png';
 
 import backgroundMusic from '../assets/music_game_2.mp3';
+import { WebsocketSingleton } from './websocketSingleton';
+import { useNavigate, useParams } from 'react-router-dom';
+import { send } from 'process';
 
 interface Data {
     createdList: number[];
@@ -28,7 +31,12 @@ enum GameMode {
   Practice = 'Practice'
 }
 
+const socketsingleton: WebsocketSingleton = WebsocketSingleton.instance;
+const scoreList = new Array();
+
+
 function Simon() {
+  const { isMultiplayer } = useParams();
   const [datas, setData] = useState<Data>();
   //const [dataString1, setDataString1] = useState<string>('');
   //const [dataString2, setDataString2] = useState<string>('');
@@ -40,8 +48,39 @@ function Simon() {
   const [id] = useState<string | null>(localStorage.getItem("ID"));
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null); 
+  const [gameEnded, setGameEnded] = useState<boolean>(false);
+  const [gameLost, setGameLost] = useState<number>(-1);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const navigate = useNavigate(); 
 
+  if(isMultiplayer){
+    socketsingleton.socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "simon_score") {
+        scoreList.push(data.score);
+      } 
+      else if(data.type === "game_end"){
+        console.log("Game ended...");
+        console.log("Other players results: " + scoreList);
+        setGameEnded(true);
+        if (scoreList.length > 0) {
+          const maxScore = Math.max(...scoreList);
+          if (maxScore >= score) {
+            setGameLost(1);
+          } else {
+            setGameLost(0);
+          }
+        }
+      }
+    };
+  }
+
+  const sendSimonScore = () => {
+    if (isMultiplayer) {
+      console.log("Sending simon score...: " + score);
+      socketsingleton.socket.send(JSON.stringify({ type: "simon_score", score: score }));
+    }
+  }
 
   const fetchMuteStatus = async () => {
     try {
@@ -282,6 +321,7 @@ const putScore = async (newSimonScore: number) => {
   };
 
   async function postData(data: Data) {
+    console.log("SIMON GAME LOST")
     try {
       
         console.log('Posting data:', JSON.stringify(data));
@@ -335,83 +375,110 @@ const putScore = async (newSimonScore: number) => {
 
     return (
         <>
-            <div className="controls" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <button
+            {!isMultiplayer && (
+              <>
+                <div className="controls" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <button
                     onClick={gameMode === GameMode.Practice ? toggleMainMode : togglePracticeMode}
                     style={{ width: '250px', height: '60px' }}
-                >
+                  >
                     {gameMode === GameMode.Practice ? 'Switch to main mode' : 'Switch to practice mode'}
-                </button>
-            </div>
-            <audio ref={audioRef} src={backgroundMusic} loop />
-            <div className="controls" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-                {gameMode === GameMode.Practice && (
+                  </button>
+                </div>
+                <audio ref={audioRef} src={backgroundMusic} loop />
+                <div className="controls" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                  {gameMode === GameMode.Practice && (
                     <select
-                        value={currentDifficulty}
-                        onChange={handleDifficultyChange}
-                        style={{ marginBottom: '10px' }}
-             >
-
-            <option value="4">Very Easy</option>
-            <option value="5">Easy</option>
-            <option value="6">Medium</option>
-            <option value="7">Hard</option>
-            <option value="8">Nightmare</option>
-            <option value="9">Impossible</option>
-            <option value="0">Custom</option>
-          </select>
-        )}
-      </div>
-    <div className='center'>
-      <div>
-        <div className="image-container">
-          <img src={Follow} alt="Follow Image" className="image" />
-          {buttonPositions.map((pos, index) => (
-            <button
-              key={index}
-              className={`image-button ${flashingButtons[index] ? 'flashing' : ''}`}
-              style={{ top: pos.top, left: pos.left, width: '50px', height: '50px' }}
-            />
-          ))}
-        </div>
-        <div className="image-container">
-          <img src={Keypad} alt="Keypad Image" className="image" />
-          {buttonPositions.map((pos, index) => (
-            <button
-              key={index}
-              className="image-button"
-              style={{ top: pos.top, left: pos.left, width: '50px', height: '50px' }}
-              onClick={() => {
-                handleFlash(index);
-                if (datas) {
-                  const updatedUserInput = [...datas.expectedList, index + 1];
-                  const updatedData = {
-                    ...datas,
-                    expectedList: Array.isArray(datas.expectedList) ? [...datas.expectedList, index + 1] : [index + 1],
-                  };
-                  setData(updatedData);
-                  //const dataString2 = updatedData.expectedList.join(', ');
-                  //setDataString2(dataString2);
-                  postData(updatedData);
-                  if (updatedUserInput.length === datas.createdList.length) {
-                    if (JSON.stringify(updatedUserInput) === JSON.stringify(datas.createdList)) {
-                      evaluateScore(updatedUserInput, updatedData);
-                      setHasFlashed(false);
+                      value={currentDifficulty}
+                      onChange={handleDifficultyChange}
+                      style={{ marginBottom: '10px' }}
+                    >
+                      <option value="4">Very Easy</option>
+                      <option value="5">Easy</option>
+                      <option value="6">Medium</option>
+                      <option value="7">Hard</option>
+                      <option value="8">Nightmare</option>
+                      <option value="9">Impossible</option>
+                      <option value="0">Custom</option>
+                    </select>
+                  )}
+                </div>
+              </>
+            )}
+    <div>
+      <div className='center' style={{filter: `blur(${gameEnded ? "10px" : "0"})`, pointerEvents: (gameEnded ? "none" : "auto"),
+          userSelect: (gameEnded ? "none" : "auto")
+        }}>
+        <div>
+          <div className="image-container">
+            <img src={Follow} alt="Follow Image" className="image" />
+            {buttonPositions.map((pos, index) => (
+              <button
+                key={index}
+                className={`image-button ${flashingButtons[index] ? 'flashing' : ''}`}
+                style={{ top: pos.top, left: pos.left, width: '50px', height: '50px' }}
+              />
+            ))}
+          </div>
+          <div className="image-container">
+            <img src={Keypad} alt="Keypad Image" className="image" />
+            {buttonPositions.map((pos, index) => (
+              <button
+                key={index}
+                className="image-button"
+                style={{ top: pos.top, left: pos.left, width: '50px', height: '50px' }}
+                onClick={() => {
+                  handleFlash(index);
+                  if (datas) {
+                    const updatedUserInput = [...datas.expectedList, index + 1];
+                    const updatedData = {
+                      ...datas,
+                      expectedList: Array.isArray(datas.expectedList) ? [...datas.expectedList, index + 1] : [index + 1],
+                    };
+                    setData(updatedData);
+                    //const dataString2 = updatedData.expectedList.join(', ');
+                    //setDataString2(dataString2);
+                    postData(updatedData);
+                    if (updatedUserInput.length === datas.createdList.length) {
+                      if (JSON.stringify(updatedUserInput) === JSON.stringify(datas.createdList)) {
+                        evaluateScore(updatedUserInput, updatedData);
+                        setHasFlashed(false);
+                      }
+                      else{
+                        console.log("Game Lost...");
+                        setGameEnded(true);
+                        sendSimonScore();
+                      }
                     }
-                  } else {
-                    setScore(0);
                   }
-                }
-              }}
-            />
-          ))}
-        </div>
+                }}
+              />
+            ))}
+          </div>
         <div>{contents}</div>
       </div>
+    </div>
+    {gameEnded && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'white',
+          padding: '20px',
+          borderRadius: '10px',
+          boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
+          textAlign: 'center'
+        }}>
+          {gameLost == -1 ? <h2>Waiting for other players...</h2> : (gameLost == 0 ? <h2>You won! 🎉🎉</h2> : <h2>You lost</h2>)}
+          <button onClick={() => navigate('/home')}>Back to Home</button>
+        </div>
+      )}
     </div>
   </>
 );
 
 }
+
 
 export default Simon;

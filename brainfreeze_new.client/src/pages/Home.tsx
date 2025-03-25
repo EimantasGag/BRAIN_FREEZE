@@ -59,10 +59,10 @@ export default function Home() {
                 Select a game to play!<br />And remember...
             </p>
             <div className="button-grid">
-                <Link to="/card-flip">
+                <Link to="/card-flip/false">
                     <button className="game-button" onClick={setSecureId}>Card Flip</button>
                 </Link>
-                <Link to="/simon">
+                <Link to="/simon/true">
                     <button className="game-button" onClick={setSecureId}>Simon</button>
                 </Link>
                 <Link to="/nrg">
@@ -70,6 +70,9 @@ export default function Home() {
                 </Link>
                 <Link to="/scoreboard">
                     <button className="game-button" onClick={setSecureId}>Scoreboard</button>
+                </Link>
+                <Link to="/multiplayer">
+                    <button className="game-button" onClick={setSecureId}>Multiplayer</button>
                 </Link>
             </div>
 

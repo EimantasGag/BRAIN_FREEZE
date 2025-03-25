@@ -7,6 +7,7 @@ import NRG from './pages/NRG';
 import Scoreboard from './pages/Scoreboard';
 import Login from './Login';
 import PrivateRoute from './components/PrivateRoute';
+import Multiplayer from './pages/Multiplayer';
 
 function App() {
     const location = useLocation();
@@ -18,12 +19,14 @@ function App() {
             {shouldShowHeader && <Header />}
             <Routes>
                 <Route path="/" element={<Login />} />
+                
                 <Route element={<PrivateRoute />}>
                     <Route path="/home" element={<Home />} />
-                    <Route path="/card-flip" element={<CardFlip />} />
-                    <Route path="/simon" element={<Simon />} />
+                    <Route path="/card-flip/:isMultiplayer" element={<CardFlip />} />
+                    <Route path="/simon/:isMultiplayer" element={<Simon />} />
                     <Route path="/nrg" element={<NRG />} />
                     <Route path="/scoreboard" element={<Scoreboard />} />
+                    <Route path="/multiplayer" element={<Multiplayer />} />
                 </Route>
             </Routes>
         </div>

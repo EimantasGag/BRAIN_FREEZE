@@ -3,6 +3,8 @@ import { useState, useEffect,useRef} from 'react';
 import './NRG.css';
 import Grid from '../assets/Grid-1000-10-2-100.png';
 import backgroundMusic from '../assets/music_game_1.mp3'; // Make sure the path is correct
+import { useNavigate, useParams } from 'react-router-dom';
+import { WebsocketSingleton } from './websocketSingleton';
 
 interface Data {
   createdList: number[];
@@ -12,8 +14,11 @@ interface Data {
 }
 
 const defaultLevel = '4';
+const socketsingleton: WebsocketSingleton = WebsocketSingleton.instance;
+const scoreList = new Array();
 
 function NRG() {
+  const { isMultiplayer } = useParams();
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const [datas, setData] = useState<Data>();
   const [dataString1, setDataString1] = useState<string>(''); 
@@ -21,7 +26,39 @@ function NRG() {
   const [id] = useState<number | null>(Number(localStorage.getItem("ID")));
   const [highScore, setHighScore] = useState<number | null>(4);
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [gameEnded, setGameEnded] = useState<boolean>(false);
+  const [gameLost, setGameLost] = useState<number>(-1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const navigate = useNavigate(); 
+
+  if(isMultiplayer){
+    socketsingleton.socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "nrg_score") {
+        scoreList.push(data.score);
+      } 
+      else if(data.type === "game_end"){
+        console.log("Game ended...");
+        console.log("Other players results: " + scoreList);
+        setGameEnded(true);
+        if (scoreList.length > 0) {
+          const maxScore = Math.max(...scoreList);
+          if (maxScore > datas?.level!) {
+            setGameLost(1);
+          } else {
+            setGameLost(0);
+          }
+        }
+      }
+    };
+  }
+
+    const sendNRGScore = () => {
+      if (isMultiplayer) {
+        console.log("Sending NRG score...: " + datas?.level);
+        socketsingleton.socket.send(JSON.stringify({ type: "nrg_score", score: datas?.level }));
+      }
+    };
 
     const [flashingButtons, setFlashingButtons] = useState(Array(25).fill(false));
     const buttonPositions = [
@@ -198,6 +235,12 @@ function NRG() {
       const results = await response.json();
       const result = results.data;
       console.log(results.message);
+
+      if(results.message == "Loser!"){
+        sendNRGScore();
+        setGameEnded(true);
+      }
+      
       if (datas?.level != null && highScore != null) {
           if (results.message == "Congrats player!" && datas?.level > highScore) {
               putDbHighScore(datas?.level);
@@ -247,7 +290,10 @@ function NRG() {
   };
 
     return (
-      <div className='center'>
+      <div>
+      <div className='center' style={{filter: `blur(${gameEnded ? "10px" : "0"})`, pointerEvents: (gameEnded ? "none" : "auto"),
+          userSelect: (gameEnded ? "none" : "auto")
+        }}>
         <><div className="block" >
               <audio ref={audioRef} src={backgroundMusic} loop />
               <div className='image-container1'>
@@ -278,21 +324,41 @@ function NRG() {
             {datas && datas.createdList.includes(index)? datas.createdList.indexOf(index) + 1 : ''}
             </button>
           ))}
-          <div>{dataString1}</div>
-          <div>{dataString2}</div>
-          <button onClick={handleArray}></button>
           <div className="level-text">Level: {datas?.level ?? defaultLevel}</div>
-          <div 
-              className="restart-button" 
-              onClick={restartGame} 
-              role="button" 
-              aria-label="Restart Game"
-          />
-
-          <div >(index starts from zero)</div>
+            {!isMultiplayer && (
+            <>
+              <div>{dataString1}</div>
+              <div>{dataString2}</div>
+              <button onClick={handleArray}></button>
+              <div 
+                className="restart-button" 
+                onClick={restartGame} 
+                role="button" 
+                aria-label="Restart Game"
+              />
+              <div >(index starts from zero)</div>
+            </>
+            )}
           </div>
           </div>
         </>
+      </div>
+      {gameEnded && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'white',
+          padding: '20px',
+          borderRadius: '10px',
+          boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
+          textAlign: 'center'
+        }}>
+          {gameLost == -1 ? <h2>Waiting for other players...</h2> : (gameLost == 0 ? <h2>You won! 🎉🎉</h2> : <h2>You lost</h2>)}
+          <button onClick={() => navigate('/home')}>Back to Home</button>
+        </div>
+      )}
       </div>
     );
   }

@@ -62,10 +62,10 @@ export default function Home() {
                 <Link to="/card-flip/false">
                     <button className="game-button" onClick={setSecureId}>Card Flip</button>
                 </Link>
-                <Link to="/simon/true">
+                <Link to="/simon/false">
                     <button className="game-button" onClick={setSecureId}>Simon</button>
                 </Link>
-                <Link to="/nrg">
+                <Link to="/nrg/false">
                     <button className="game-button" onClick={setSecureId}>NRG</button>
                 </Link>
                 <Link to="/scoreboard">

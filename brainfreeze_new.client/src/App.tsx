@@ -24,7 +24,7 @@ function App() {
                     <Route path="/home" element={<Home />} />
                     <Route path="/card-flip/:isMultiplayer" element={<CardFlip />} />
                     <Route path="/simon/:isMultiplayer" element={<Simon />} />
-                    <Route path="/nrg" element={<NRG />} />
+                    <Route path="/nrg/:isMultiplayer" element={<NRG />} />
                     <Route path="/scoreboard" element={<Scoreboard />} />
                     <Route path="/multiplayer" element={<Multiplayer />} />
                 </Route>

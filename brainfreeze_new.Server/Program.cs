@@ -1,13 +1,21 @@
 using brainfreeze_new.Server.Models;
 using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL;
+using dotenv.net;
+DotEnv.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Accessing the connection string from appsettings.json
 var frontendUrlPub = builder.Configuration["Frontend:UrlPub"];
 var frontendUrlPriv = builder.Configuration["Frontend:UrlPriv"];
-var connectionString = builder.Configuration.GetConnectionString("DevConnection");
 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new Exception("Connection string not found. Ensure ConnectionStrings__DefaultConnection is set in .env or environment.");
+}
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -21,12 +29,10 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 
-
-builder.Services.AddControllers();
-
 // Registering the DbContext with the connection string
-builder.Services.AddDbContext<ScoreboardDBContext>(options =>
-    options.UseSqlServer(connectionString));
+builder.Services.AddDbContext<AppDBContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 
 // Add Swagger
 builder.Services.AddEndpointsApiExplorer();

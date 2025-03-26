@@ -8,16 +8,18 @@ namespace brainfreeze_new.Server.Models
         [Key]
         public int Id { get; set; }
 
-        public int Place { get; set; }
+        [ForeignKey("User")]
+        public int UserId { get; set; }
 
-        [Column(TypeName ="nvarchar(100)")]
-        public String? Username { get; set; }
+        [ForeignKey("Game")]
+        public int GameId { get; set; }
 
-        public int SimonScore { get; set; }
+        [Column(TypeName = "varchar(100)")]
+        public required int Score { get; set; }
 
-        public int CardflipScore { get; set; }
+        [Column(TypeName = "timestamp without time zone")]
+        public DateTime Timestamp { get; set; } = DateTime.Now;
 
-        public int NrgScore { get; set; }
 
     }
 }

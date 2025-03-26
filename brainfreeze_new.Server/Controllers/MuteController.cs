@@ -9,15 +9,16 @@ namespace brainfreeze_new.Server.Controllers
         private static bool _isMuted = false;
 
         [HttpPost]
-        public IActionResult SetMuteState([FromBody] MuteState muteState){
+        public IActionResult SetMuteState([FromBody] MuteState muteState)
+        {
             Console.WriteLine($"Received mute state: {muteState.IsMuted}");
             _isMuted = muteState.IsMuted;
             return Ok(new { message = "Mute state updated" });
         }
 
         [HttpGet]
-        public IActionResult GetMuteState(){
-            Console.WriteLine($"Current mute state: {_isMuted}");
+        public IActionResult GetMuteState()
+        {
             return Ok(new { isMuted = _isMuted });
         }
     }

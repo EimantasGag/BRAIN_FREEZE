@@ -5,7 +5,7 @@ export class WebsocketSingleton {
 
     private constructor() {
         console.log("CONNECTING TO WEBSOCKET");
-        this.socket = new WebSocket("ws://localhost:8080");
+        this.socket = new WebSocket("ws://localhost:8070");
     }
 
     public static get instance(): WebsocketSingleton {

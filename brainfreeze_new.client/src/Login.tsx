@@ -1,9 +1,8 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-
-
 const Login = () => {
+    // Make sure that VITE_BACKEND_URL does NOT already include the trailing "api/"
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
     const [username, setUsername] = useState("");
     const navigate = useNavigate();
@@ -12,9 +11,8 @@ const Login = () => {
         const token = localStorage.getItem("ID");
         if (token) {
             navigate("/home");
-        }
-        else {
-            console.log("User not found returning to login");
+        } else {
+            console.log("No user logged in, please login.");
         }
     }, [navigate]);
 
@@ -24,7 +22,6 @@ const Login = () => {
             if (!response.ok) {
                 throw new Error(`Error fetching session ID: ${response.statusText}`);
             }
-
             const data = await response.json();
             if (data.sessionId) {
                 localStorage.setItem("sessionId", data.sessionId);
@@ -37,90 +34,49 @@ const Login = () => {
         }
     };
 
-    const initializeDatabaseEntry = async (): Promise<number | null> => {
+    // Function to create a new user using POST /Users
+    const createUser = async () => {
         try {
-            const response = await fetch(`${backendUrl}Scoreboards`, {
+            const response = await fetch(`${backendUrl}Users`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({
-                    place: 0,
-                    username,
-                    simonScore: 0,
-                    cardflipScore: 999999,
-                    nrgScore: 0,
-                }),
+                // The API expects a JSON string with the username in the body
+                body: JSON.stringify(username),
             });
-    
+
             if (!response.ok) {
-                console.error("Error initializing database entry:", await response.text());
-                return null;
+                throw new Error(`Error creating user: ${response.statusText}`);
             }
-    
+
             const newUser = await response.json();
-            console.log("New user added to the database:", newUser);
+            console.log("New user created:", newUser);
             return newUser.id;
         } catch (error) {
-            console.error("Error initializing database entry:", error);
+            console.error("Error creating new user:", error);
             return null;
         }
     };
-    
-    const fetchUserScores = async () => {
+
+    // Function to fetch a user by username (GET /Users/{username})
+    const fetchUserByUsername = async () => {
         try {
-            const response = await fetch(`${backendUrl}Scoreboards/get-by-username/${username}`);
-            
-            if (!response.ok) {
-                if (response.status === 404) {
-                    console.log("Trying to create a new user");
-                    const newUserId = await initializeDatabaseEntry();
-
-                    const user = { id: newUserId, username };
-                    if(user.id){
-                        localStorage.setItem("ID", user.id.toString());
-                        console.log(`Logged in as user ID: ${user.id}`);
-
-                        await fetchNewSessionId();
-                        navigate("/home");
-                        return;
-                    } else {
-                        throw new Error(`Error fetching scores: ${response.statusText}`);
-                    }
-                }
+            const response = await fetch(`${backendUrl}Users/${username}`);
+            if (response.ok) {
+                const user = await response.json();
+                return user.id;
+            } else if (response.status === 404) {
+                // Silently create a new user if not found
+                return await createUser();
+            } else {
+                throw new Error(`Error fetching user: ${response.statusText}`);
             }
-    
-            let user = await response.json();
-            
-            if (!user || !user.id) {
-                console.log(`User not found. Creating entry for ${username}.`);
-                const newUserId = await initializeDatabaseEntry();
-    
-                if (newUserId === null) {
-                    alert("Failed to create user. Please try again.");
-                    return;
-                }
-    
-                user = { id: newUserId, username };
-            }
-    
-            localStorage.setItem("ID", user.id.toString());
-            console.log(`Logged in as user ID: ${user.id}`);
-    
-            await fetchNewSessionId();
-            navigate("/home");
-    
         } catch (error) {
-            console.error("Error fetching user scores:", error);
-            console.log("Entering offline mode");
-            localStorage.setItem("ID", "-1");
-            console.log(`Logged in as user ID: -1`);
-            navigate("/home");
+            console.error("Error fetching user by username:", error);
+            return null;
         }
     };
-    
-    
-    
 
     const handleLogin = async () => {
         if (!username.trim()) {
@@ -128,7 +84,15 @@ const Login = () => {
             return;
         }
 
-        await fetchUserScores();
+        const userId = await fetchUserByUsername();
+        if (userId !== null) {
+            localStorage.setItem("ID", userId.toString());
+            console.log(`Logged in as user ID: ${userId}`);
+            await fetchNewSessionId();
+            navigate("/home");
+        } else {
+            alert("Failed to login. Please try again.");
+        }
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -158,7 +122,6 @@ const Login = () => {
             </div>
         </div>
     );
-    
 };
 
 export default Login;

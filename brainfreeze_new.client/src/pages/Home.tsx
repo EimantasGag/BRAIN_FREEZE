@@ -1,6 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './Home.css';
-import { useEffect, useState } from 'react';
 
 export default function Home() {
 
@@ -20,24 +20,24 @@ export default function Home() {
         try {
             const tempid = localStorage.getItem("ID");
             setID(tempid);
-            const response = await fetch(`${backendUrl}Scoreboards/get-by-id/${id}`);
+            const response = await fetch(`${backendUrl}Users/id/${id}`);
             if (!response.ok) {
-                throw new Error(`Error fetching scores: ${response.statusText}`);
+                throw new Error(`Error fetching user: ${response.statusText}`);
             }
-
             const user = await response.json();
-
             if (user) {
                 setID(user.id.toString());
                 setUsername(user.username);
                 console.log(`User ID: ${user.id}, Username: ${user.username}`);
             } else {
-                console.warn(`User ID not found.`);
+                console.warn(`User not found.`);
             }
         } catch (error) {
-            console.error("Error fetching user scores:", error);
+            console.error("Error fetching user:", error);
         }
     };
+
+
 
     useEffect(() => {
         fetchUsername();
@@ -55,7 +55,7 @@ export default function Home() {
     return (
         <div className="button-container">
             <p>
-                Welcome To BRAINFREEZE, {username ? username : "Guest"}!<br />
+                Welcome To BRAINFREEZE!<br />
                 Select a game to play!<br />And remember...
             </p>
             <div className="button-grid">

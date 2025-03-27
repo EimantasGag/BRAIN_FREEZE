@@ -14,7 +14,6 @@ namespace brainfreeze_new.Server.Models
         [ForeignKey("Game")]
         public int GameId { get; set; }
 
-        [Column(TypeName = "varchar(100)")]
         public required int Score { get; set; }
 
         [Column(TypeName = "timestamp without time zone")]

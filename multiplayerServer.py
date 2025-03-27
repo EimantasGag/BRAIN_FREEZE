@@ -8,9 +8,16 @@ from websockets import serve
 waiting_clients = set()
 cardflip_lobbies = []
 simon_lobbies = []
+nrg_lobbies = []
 
 
 class SimonLobby:
+    def __init__(self, clients):
+        self.clients = clients
+        self.finishedNumber = 0
+
+
+class NRGLobby:
     def __init__(self, clients):
         self.clients = clients
         self.finishedNumber = 0
@@ -29,12 +36,14 @@ async def start_countdown():
         game_lobby.add(client)
 
     # TODO: Randomize game selection
-    randomGame = random.choice(["cardflip", "simon"])
+    randomGame = random.choice(["cardflip", "simon", "nrg"])
 
     if randomGame == "cardflip":
         cardflip_lobbies.append(game_lobby)
     elif randomGame == "simon":
         simon_lobbies.append(SimonLobby(game_lobby))
+    elif randomGame == "nrg":
+        nrg_lobbies.append(NRGLobby(game_lobby))
 
     print("New live game lobby created: " + str(game_lobby))
 
@@ -96,6 +105,22 @@ async def handler(websocket):
                             for client in game.clients:
                                 await client.send(gameend_msg)
                             simon_lobbies.remove(game)
+                        break
+            elif data["type"] == "nrg_score":
+                update_score_msg = json.dumps(
+                    {"type": "nrg_score", "score": data["score"]})
+                gameend_msg = json.dumps({"type": "game_end"})
+                for game in nrg_lobbies:
+                    if websocket in game.clients:
+                        game.finishedNumber += 1
+                        for client in game.clients:
+                            if client != websocket:
+                                await client.send(update_score_msg)
+                        if game.finishedNumber == len(game.clients):
+                            print("NRG game ended")
+                            for client in game.clients:
+                                await client.send(gameend_msg)
+                            nrg_lobbies.remove(game)
                         break
 
     except websockets.exceptions.ConnectionClosed:

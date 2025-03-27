@@ -63,7 +63,7 @@ function Simon() {
         setGameEnded(true);
         if (scoreList.length > 0) {
           const maxScore = Math.max(...scoreList);
-          if (maxScore >= score) {
+          if (maxScore > score) {
             setGameLost(1);
           } else {
             setGameLost(0);

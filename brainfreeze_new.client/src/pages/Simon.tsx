@@ -37,6 +37,8 @@ const GAME_TYPE_SIMON = 2;
 
 function Simon() {
   const { isMultiplayer } = useParams();
+  const multiplayer = isMultiplayer === 'true';
+
   const [datas, setData] = useState<Data>();
   const [flashingButtons, setFlashingButtons] = useState(Array(9).fill(false));
   const [score, setScore] = useState<number>(0);
@@ -51,7 +53,7 @@ function Simon() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const navigate = useNavigate();
 
-  if (isMultiplayer) {
+  if (multiplayer) {
     socketsingleton.socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === "simon_score") {
@@ -77,7 +79,7 @@ function Simon() {
   const postGameRecord = async (): Promise<{ id: number } | null> => {
     const gamePayload = {
       Type: GAME_TYPE_SIMON,
-      isMultiplayer: false,
+      multiplayer: false,
     };
     try {
       const response = await fetch(`${backendUrl}Game`, {
@@ -407,7 +409,7 @@ function Simon() {
 
   return (
     <>
-      {!isMultiplayer && (
+      {!multiplayer && (
         <>
           <div className="controls" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <button
@@ -502,7 +504,17 @@ function Simon() {
             boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
             textAlign: 'center'
           }}>
-            {gameLost === -1 ? <h2>Waiting for other players...</h2> : (gameLost === 0 ? <h2>You won! 🎉🎉</h2> : <h2>You lost</h2>)}
+            {multiplayer ? (
+              gameLost === -1 ? (
+                <h2>Waiting for other players...</h2>
+              ) : gameLost === 0 ? (
+                <h2>You won! 🎉🎉</h2>
+              ) : (
+                <h2>You lost</h2>
+              )
+            ) : (
+              <h2>Game Over</h2>
+            )}
             <button onClick={() => navigate('/home')}>Back to Home</button>
           </div>
         )}

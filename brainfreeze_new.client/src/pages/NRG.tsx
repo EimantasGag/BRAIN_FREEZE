@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import Grid from '../assets/Grid-1000-10-2-100.png';
 import backgroundMusic from '../assets/music_game_1.mp3'; // Make sure the path is correct
-import { useNavigate, useParams } from 'react-router-dom';
-import { WebsocketSingleton } from './websocketSingleton';
 import './NRG.css';
+import { WebsocketSingleton } from './websocketSingleton';
 
 
 interface Data {
@@ -14,10 +14,9 @@ interface Data {
   difficulty: 'VeryEasy' | 'Easy' | 'Medium' | 'Hard' | 'Nightmare' | 'Impossible';
 }
 
-const defaultLevel = '4';
+const defaultLevel = 4;
 const socketsingleton: WebsocketSingleton = WebsocketSingleton.instance;
 const scoreList = new Array();
-const defaultLevel = 4;
 
 function NRG() {
   const { isMultiplayer } = useParams();
@@ -137,7 +136,6 @@ function NRG() {
         }
       }
 
-      // Make sure we have a valid user ID
       if (!id) {
         console.error("User ID is missing");
         return;
@@ -172,7 +170,6 @@ function NRG() {
     }
   };
 
-  // --- Fetch the high score for gametype 1 ---
   const fetchHighScore = async () => {
     try {
       if (id) {
@@ -187,6 +184,23 @@ function NRG() {
       console.error("Failed to fetch high score:", err);
     }
   };
+
+  const putDbHighScore = async (finalScore: number) => {
+    const fetchHighScore = async () => {
+      try {
+        if (id) {
+          const response = await fetch(`${backendUrl}Scoreboards/MaxScore/${id}/1`);
+          if (!response.ok) {
+            throw new Error(`https error! Status: ${response.status}`);
+          }
+          const data = await response.json();
+          setHighScore(data.maxScore);
+        }
+      } catch (err: any) {
+        console.error("Failed to fetch high score:", err);
+      }
+    }
+  }
 
 
 
@@ -305,9 +319,6 @@ function NRG() {
         setDataString1(dataString1);
         const dataString2 = result.expectedList.join(', ');
         setDataString2(dataString2);
-        // Note: We no longer create a game or submit a score here.
-      } else {
-        console.error('Error in API request: ', response.statusText);
       }
     } catch (error) {
       console.error("Failed to post data", error);
@@ -424,7 +435,17 @@ function NRG() {
           boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
           textAlign: 'center'
         }}>
-          {gameLost == -1 ? <h2>Waiting for other players...</h2> : (gameLost == 0 ? <h2>You won! 🎉🎉</h2> : <h2>You lost</h2>)}
+          {isMultiplayer ? (
+            gameLost === -1 ? (
+              <h2>Waiting for other players...</h2>
+            ) : gameLost === 0 ? (
+              <h2>You won! 🎉🎉</h2>
+            ) : (
+              <h2>You lost</h2>
+            )
+          ) : (
+            <h2>Game Over</h2>
+          )}
           <button onClick={() => navigate('/home')}>Back to Home</button>
         </div>
       )}

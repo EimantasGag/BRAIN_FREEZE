@@ -110,6 +110,33 @@ function NRG() {
         }
     };
 
+    const logGameCompletion = async (score: number, isWinner: boolean) => {
+      try {
+        const userId = id || 0;
+        const gameType = "NRG";
+        const multiplayer = isMultiplayer === "true";
+    
+        const response = await fetch(`${backendUrl}Score/log`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId,
+            gameType,
+            score,
+            isWinner: multiplayer ? isWinner : false,
+          }),
+        });
+    
+        if (!response.ok) {
+          throw new Error(`Error logging game completion: ${response.statusText}`);
+        }
+      } catch (error) {
+        console.error('Failed to log game completion:', error);
+      }
+    };
+
     const putDbHighScore = async (finalScore: number) => {
         try {
             console.log("Updating user score");
@@ -219,48 +246,50 @@ function NRG() {
     }
   };
 
-  async function postData(data : Data) 
-  {
+  async function postData(data: Data) {
     try {
       console.log('Posting data:', JSON.stringify(data));
-        const response = await fetch(`${backendUrl}NRG`, {
+      const response = await fetch(`${backendUrl}NRG`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
       });
-
+  
       if (response.ok) {
-      const results = await response.json();
-      const result = results.data;
-      console.log(results.message);
-
-      if(results.message == "Loser!"){
-        sendNRGScore();
-        setGameEnded(true);
-      }
-      
-      if (datas?.level != null && highScore != null) {
-          if (results.message == "Congrats player!" && datas?.level > highScore) {
-              putDbHighScore(datas?.level);
+        const results = await response.json();
+        const result = results.data;
+        console.log(results.message);
+  
+        if (results.message === "Loser!") {
+          sendNRGScore();
+          setGameEnded(true);
+          // Log game completion (loss)
+          await logGameCompletion(datas?.level || 0, false);
+        } else if (results.message === "Congrats player!") {
+          // Log game completion (win)
+          await logGameCompletion(datas?.level || 0, true);
+          if (datas?.level != null && highScore != null) {
+            if (datas.level > highScore) {
+              putDbHighScore(datas.level);
+            }
           }
+        }
+  
+        console.log('API response:', result);
+        setData(result);
+        const dataString1 = result.createdList.join(', ');
+        setDataString1(dataString1);
+        const dataString2 = result.expectedList.join(', ');
+        setDataString2(dataString2);
+      } else {
+        console.error('Error in API request:', response.statusText);
       }
-      console.log('API response: ', result);
-      setData(result);
-      const dataString1 = result.createdList.join(', '); 
-      setDataString1(dataString1); 
-      const dataString2 = result.expectedList.join(', ');
-      setDataString2(dataString2);
-      }
-      else {
-        console.error('Error in API request: ', response.statusText);
-      }
-    } 
-    catch (error) {
+    } catch (error) {
       console.error("Failed to fetch data", error);
     }
-  } 
+  }
   
   const handleArray = () => {
     if (datas && datas.level >=4) {

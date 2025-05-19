@@ -23,14 +23,16 @@ const CardFlip = () => {
   const [gameEnded, setGameEnded] = useState<boolean>(false);
   const navigate = useNavigate();
 
-  if(isMultiplayer){
+  if (isMultiplayer) {
     socketsingleton.socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === "game_lost") {
         console.log("Game lost...");
         setGameLost(true);
         setGameEnded(true);
-      } 
+        // Log game completion (loss)
+        logGameCompletion(moveCount, false);
+      }
     };
   }
   
@@ -92,6 +94,33 @@ const CardFlip = () => {
 
     } catch (error) {
       console.log(error);
+    }
+  };
+
+  const logGameCompletion = async (score: number, isWinner: boolean) => {
+    try {
+      const userId = id || 0;
+      const gameType = "CardFlip";
+      const multiplayer = isMultiplayer === "true";
+  
+      const response = await fetch(`${backendUrl}Score/log`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          gameType,
+          score,
+          isWinner: multiplayer ? isWinner : false,
+        }),
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Error logging game completion: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Failed to log game completion:', error);
     }
   };
 
@@ -190,13 +219,15 @@ const CardFlip = () => {
       newMatchedCards[secondIndex] = true;
       setMatchedCards(newMatchedCards);
       setSelectedCards([]);
-
+  
       if (newMatchedCards.every(Boolean)) {
-        if(isMultiplayer){
+        if (isMultiplayer) {
           socketsingleton.socket.send(JSON.stringify({ type: "game_won" }));
         }
         submitScore(moveCount + 1);
         setGameEnded(true);
+        // Log game completion (win)
+        logGameCompletion(moveCount + 1, true);
       }
     } else {
       setTimeout(() => {

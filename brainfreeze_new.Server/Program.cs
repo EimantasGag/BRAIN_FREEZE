@@ -1,12 +1,13 @@
 using brainfreeze_new.Server.Models;
 using Microsoft.EntityFrameworkCore;
+using brainfreeze_new.Server.Services; // Add this if AchievementService is in the Services namespace
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Accessing the connection string from appsettings.json
 var frontendUrlPub = builder.Configuration["Frontend:UrlPub"];
 var frontendUrlPriv = builder.Configuration["Frontend:UrlPriv"];
-var connectionString = builder.Configuration.GetConnectionString("DevConnection");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
 builder.Services.AddCors(options =>
 {
@@ -17,6 +18,16 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader()
               .AllowCredentials();
     });
+
+    options.AddPolicy("AllowLocalhost", policy =>
+    {
+        policy.WithOrigins(
+            "https://localhost:7005", // Swagger UI
+            "https://localhost:5173"  // Frontend
+        )
+        .AllowAnyHeader()
+        .AllowAnyMethod();
+    });
 });
 
 builder.Services.AddControllers();
@@ -26,7 +37,10 @@ builder.Services.AddControllers();
 
 // Registering the DbContext with the connection string
 builder.Services.AddDbContext<ScoreboardDBContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseNpgsql(connectionString));
+
+// Registering the AchievementService
+builder.Services.AddScoped<AchievementService>();
 
 // Add Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -51,6 +65,7 @@ app.UseHttpsRedirection();
 app.UseRouting();
 
 app.UseCors("AllowFrontend");
+app.UseCors("AllowLocalhost");
 
 app.UseAuthorization();
 

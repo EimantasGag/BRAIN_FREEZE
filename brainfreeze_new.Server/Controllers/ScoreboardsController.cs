@@ -12,11 +12,15 @@ namespace brainfreeze_new.Server.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ScoreboardsController(ScoreboardDBContext context) : ControllerBase
+    public class ScoreboardsController : ControllerBase
     {
-        private readonly ScoreboardDBContext _context = context;
+        private readonly ScoreboardDBContext _context;
 
-        // GET: api/Scoreboards
+        public ScoreboardsController(ScoreboardDBContext context)
+        {
+            _context = context;
+        }
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Scoreboard>>> Getscoreboards()
         {
@@ -24,13 +28,30 @@ namespace brainfreeze_new.Server.Controllers
         }
 
         [HttpGet("get-by-id/{id}")]
-        public async Task<ActionResult<Scoreboard>> GetScoreboardById(int id)
+        public async Task<ActionResult<object>> GetScoreboardById(int id)
         {
             try
             {
                 var scoreboard = await _context.Scoreboards.FindAsync(id);
+                if (scoreboard == null)
+                    throw new ResourceNotFoundException($"Scoreboard with ID {id} not found.");
 
-                return scoreboard == null ? throw new ResourceNotFoundException($"Scoreboard with ID {id} not found.") : (ActionResult<Scoreboard>)scoreboard;
+                var gameHistory = await _context.GameHistories
+                    .Where(gh => gh.UserId == id)
+                    .ToListAsync();
+
+                var totalGames = gameHistory.Count;
+                var multiplayerMatches = gameHistory.Count(gh => gh.GameType.ToLower() == "multiplayer");
+
+                return Ok(new
+                {
+                    scoreboard.Id,
+                    scoreboard.Username,
+                    scoreboard.Email,
+                    JoinDate = scoreboard.CreatedAt.ToString("MM/dd/yyyy"),
+                    TotalGames = totalGames,
+                    MultiplayerMatches = multiplayerMatches
+                });
             }
             catch (ResourceNotFoundException ex)
             {
@@ -44,8 +65,6 @@ namespace brainfreeze_new.Server.Controllers
             }
         }
 
-
-        // GET: api/Scoreboards/get-by-username/
         [HttpGet("get-by-username/{username}")]
         public async Task<ActionResult<Scoreboard>> GetScoreboardByUsername(string username)
         {
@@ -61,7 +80,6 @@ namespace brainfreeze_new.Server.Controllers
 
                 if (scoreboard == null)
                 {
-
                     throw new ResourceNotFoundException($"Scoreboard with username '{username}' not found.");
                 }
 
@@ -79,17 +97,12 @@ namespace brainfreeze_new.Server.Controllers
             }
         }
 
-
-
-
-        // PUT: api/Scoreboards/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
         public async Task<IActionResult> PutScoreboard(int id, Scoreboard scoreboard)
         {
             scoreboard.Id = id;
 
-            _context.Entry(scoreboard).State = Microsoft.EntityFrameworkCore.EntityState.Modified;
+            _context.Entry(scoreboard).State = EntityState.Modified;
 
             try
             {
@@ -110,8 +123,6 @@ namespace brainfreeze_new.Server.Controllers
             return NoContent();
         }
 
-        // POST: api/Scoreboards
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
         public async Task<ActionResult<Scoreboard>> PostScoreboard(Scoreboard scoreboard)
         {
@@ -128,8 +139,6 @@ namespace brainfreeze_new.Server.Controllers
             }
         }
 
-
-        // DELETE: api/Scoreboards/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteScoreboard(int id)
         {
@@ -143,7 +152,7 @@ namespace brainfreeze_new.Server.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
-        }   
+        }
 
         private bool ScoreboardExists(int id)
         {
@@ -162,6 +171,5 @@ namespace brainfreeze_new.Server.Controllers
 
             System.IO.File.AppendAllText(logPath, $"{DateTime.Now}: {ex.Message}{Environment.NewLine}{ex.StackTrace}{Environment.NewLine}");
         }
-
     }
 }

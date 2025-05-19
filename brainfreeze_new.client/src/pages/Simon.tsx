@@ -236,39 +236,51 @@ const putScore = async (newSimonScore: number) => {
 
 
 
-    const evaluateScore = async (userInput: number[], datas: Data) => {
+const evaluateScore = async (userInput: number[], datas: Data) => {
+  if (!datas) return;
+  console.log("Expected Pattern:", datas.expectedList);
+  console.log("User Input:", userInput);
 
-        if (!datas) return;
-        console.log("Expected Pattern:", datas.expectedList);
-        console.log("User Input:", userInput);
-    try {
-        const response = await fetch(`${backendUrl}score/evaluate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userInput,
-          pattern: datas.expectedList,
-          difficulty: currentDifficulty,
-        }),
-      });
+  try {
+    const userId = id; // From localStorage.getItem("ID")
+    const gameType = "Simon"; // Hardcoded since this is the Simon game
+    const multiplayer = isMultiplayer === "true"; // From URL params
+    const winner = gameLost === 0; // gameLost === 0 means the player won
 
-      if (!response.ok) {
-        throw new Error(`Error evaluating score: ${response.statusText}`);
-      }
+    const response = await fetch(`${backendUrl}score/evaluate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'UserId': userId || "0", // Fallback to "0" if id is null
+        'GameType': gameType,
+        'IsMultiplayer': multiplayer.toString(),
+        'IsWinner': winner.toString(),
+      },
+      body: JSON.stringify({
+        userInput,
+        pattern: datas.expectedList,
+        difficulty: currentDifficulty,
+      }),
+    });
 
-      const result = await response.json();
-      setScore(result.score); 
-      const previousHighScore = Number(localStorage.getItem('Simon')) || 0;
-      if (result.score > previousHighScore) {
-        localStorage.setItem('Simon', result.score.toString());
-        putScore(result.score);
-      }
-    } catch (error) {
-      console.error('Failed to evaluate score:', error);
+    if (!response.ok) {
+      throw new Error(`Error evaluating score: ${response.statusText}`);
     }
-  };
+
+    const result = await response.json();
+    setScore(result.score);
+    const previousHighScore = Number(localStorage.getItem('Simon')) || 0;
+    if (result.score > previousHighScore) {
+      localStorage.setItem('Simon', result.score.toString());
+      putScore(result.score);
+    }
+
+    // Send Simon score for multiplayer
+    sendSimonScore();
+  } catch (error) {
+    console.error('Failed to evaluate score:', error);
+  }
+};
   
   // Fetches data for the game
 

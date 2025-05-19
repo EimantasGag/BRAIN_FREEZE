@@ -8,6 +8,7 @@ import Scoreboard from './pages/Scoreboard';
 import Login from './Login';
 import PrivateRoute from './components/PrivateRoute';
 import Multiplayer from './pages/Multiplayer';
+import Profile from './pages/Profile';
 
 function App() {
     const location = useLocation();
@@ -27,6 +28,7 @@ function App() {
                     <Route path="/nrg/:isMultiplayer" element={<NRG />} />
                     <Route path="/scoreboard" element={<Scoreboard />} />
                     <Route path="/multiplayer" element={<Multiplayer />} />
+                    <Route path="/profile" element={<Profile />} />
                 </Route>
             </Routes>
         </div>

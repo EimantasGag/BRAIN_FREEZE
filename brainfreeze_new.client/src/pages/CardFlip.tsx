@@ -17,7 +17,7 @@ const CardFlip = () => {
   const [highScore, setHighScore] = useState<number | null>(null);
   const [isResetting, setIsResetting] = useState<boolean>(false);
   const [isReady, setIsReady] = useState<boolean>(true);
-  const [isMuted, setIsMuted] = useState<boolean>(false); // Mute/unmute state
+  const [isMuted, setIsMuted] = useState<boolean>(false);
   const [id] = useState<number | null>(Number(localStorage.getItem("ID")));
   const [gameLost, setGameLost] = useState<boolean>(false);
   const [gameEnded, setGameEnded] = useState<boolean>(false);
@@ -30,13 +30,12 @@ const CardFlip = () => {
         console.log("Game lost...");
         setGameLost(true);
         setGameEnded(true);
-        // Log game completion (loss)
         logGameCompletion(moveCount, false);
       }
     };
   }
-  
-  const audioRef = useRef<HTMLAudioElement | null>(null); // Reference for the audio element
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -49,9 +48,8 @@ const CardFlip = () => {
 
       const data = await response.json();
       if (data.isMuted === true) {
-        setIsMuted(true); 
-      }
-      else{
+        setIsMuted(true);
+      } else {
         setIsMuted(false);
       }
     } catch (err: any) {
@@ -61,7 +59,7 @@ const CardFlip = () => {
 
   const fetchShuffledImages = async () => {
     try {
-        const response = await fetch(`${backendUrl}cardflip/shuffledImages`);
+      const response = await fetch(`${backendUrl}cardflip/shuffledImages`);
       if (!response.ok) {
         throw new Error(`https error! Status: ${response.status}`);
       }
@@ -70,10 +68,10 @@ const CardFlip = () => {
 
       setTimeout(() => {
         setImages(data.shuffledImages);
-        setFlippedCards(new Array(data.shuffledImages.length).fill(false));  // Reset flipped state
-        setMatchedCards(new Array(data.shuffledImages.length).fill(false));  // Reset matched state
+        setFlippedCards(new Array(data.shuffledImages.length).fill(false));
+        setMatchedCards(new Array(data.shuffledImages.length).fill(false));
         setIsResetting(false);
-        setIsReady(true); 
+        setIsReady(true);
       }, 500);
     } catch (err: any) {
       setError(err.message);
@@ -82,7 +80,7 @@ const CardFlip = () => {
 
   const setIdForScore = async () => {
     try {
-        const response = await fetch(`${backendUrl}Scoreboards/get-by-id/${id}`);
+      const response = await fetch(`${backendUrl}Scoreboards/get-by-id/${id}`);
       if (!response.ok) {
         console.log(response);
         throw new Error(`https error! Status: ${response.status}`);
@@ -91,7 +89,6 @@ const CardFlip = () => {
       const user = await response.json();
       setHighScore(user.cardflipScore);
       localStorage.setItem("CardFlip", user.cardflipScore);
-
     } catch (error) {
       console.log(error);
     }
@@ -102,7 +99,7 @@ const CardFlip = () => {
       const userId = id || 0;
       const gameType = "CardFlip";
       const multiplayer = isMultiplayer === "true";
-  
+
       const response = await fetch(`${backendUrl}Score/log`, {
         method: 'POST',
         headers: {
@@ -115,7 +112,7 @@ const CardFlip = () => {
           isWinner: multiplayer ? isWinner : false,
         }),
       });
-  
+
       if (!response.ok) {
         throw new Error(`Error logging game completion: ${response.statusText}`);
       }
@@ -124,19 +121,19 @@ const CardFlip = () => {
     }
   };
 
-    const putDbHighScore = async (finalScore: number) => {
+  const putDbHighScore = async (finalScore: number) => {
     try {
       console.log("Updating user score");
-        const fetchResponse = await fetch(`${backendUrl}Scoreboards/get-by-id/${id}`);
+      const fetchResponse = await fetch(`${backendUrl}Scoreboards/get-by-id/${id}`);
       if (!fetchResponse.ok) {
         throw new Error(`Error fetching user: ${fetchResponse.statusText}`);
       }
 
       const user = await fetchResponse.json();
       if (user) {
-          const updatedUser = { ...user, cardflipScore: finalScore };
+        const updatedUser = { ...user, cardflipScore: finalScore };
 
-          const putResponse = await fetch(`${backendUrl}Scoreboards/${id}`, {
+        const putResponse = await fetch(`${backendUrl}Scoreboards/${id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -163,7 +160,7 @@ const CardFlip = () => {
     fetchShuffledImages();
     fetchMuteStatus();
 
-    const muteCheckInterval = setInterval(fetchMuteStatus, 1000); // Check every second
+    const muteCheckInterval = setInterval(fetchMuteStatus, 1000);
 
     return () => {
       clearInterval(muteCheckInterval);
@@ -171,14 +168,13 @@ const CardFlip = () => {
         audioRef.current.pause();
       }
     };
-  }, []); 
+  }, []);
 
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = 0.3;
       audioRef.current.loop = true;
 
-      // Apply mute/unmute immediately based on the state
       if (isMuted) {
         audioRef.current.pause();
         audioRef.current.muted = true;
@@ -192,8 +188,7 @@ const CardFlip = () => {
         }
       }
     }
-  }, [isMuted]); // Ensure this effect runs whenever `isMuted` changes
-
+  }, [isMuted]);
 
   const handleCardClick = (index: number) => {
     if (isResetting || selectedCards.length === 2 || matchedCards[index]) return;
@@ -219,14 +214,21 @@ const CardFlip = () => {
       newMatchedCards[secondIndex] = true;
       setMatchedCards(newMatchedCards);
       setSelectedCards([]);
-  
+
       if (newMatchedCards.every(Boolean)) {
         if (isMultiplayer) {
-          socketsingleton.socket.send(JSON.stringify({ type: "game_won" }));
+          try {
+            if (socketsingleton.socket.readyState === WebSocket.OPEN) {
+              socketsingleton.socket.send(JSON.stringify({ type: "game_won" }));
+            } else {
+              console.warn("WebSocket is not open. Current state:", socketsingleton.socket.readyState);
+            }
+          } catch (error) {
+            console.error("Error sending game_won via WebSocket:", error);
+          }
         }
         submitScore(moveCount + 1);
         setGameEnded(true);
-        // Log game completion (win)
         logGameCompletion(moveCount + 1, true);
       }
     } else {
@@ -240,45 +242,43 @@ const CardFlip = () => {
     }
   };
 
-    const submitInitScore = async (initScore: number) => {
-        try {
-            if (initScore && initScore !== highScore) {
-                console.log("Submitting initial score: ", initScore);
-                const response = await fetch(`${backendUrl}cardflip/submitInitScore`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ score: initScore }),
-                });
-                console.log(response);
-            }
-        } catch (err) {
-            setError('Failed to submit score');
+  const submitInitScore = async (initScore: number) => {
+    try {
+      if (initScore && initScore !== highScore) {
+        console.log("Submitting initial score: ", initScore);
+        const response = await fetch(`${backendUrl}cardflip/submitInitScore`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ score: initScore }),
+        });
+        console.log(response);
+      }
+    } catch (err) {
+      setError('Failed to submit score');
+    }
+  };
+
+  const submitScore = async (finalScore: number) => {
+    try {
+      console.log("Submitting score: ", finalScore);
+      const response = await fetch(`${backendUrl}cardflip/submitScore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ score: finalScore }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.newHighScore) {
+          console.log("New Highscore!");
+          setHighScore(finalScore);
+          putDbHighScore(finalScore);
+          localStorage.setItem("CardFlip", String(finalScore));
         }
-    };
-
-    const submitScore = async (finalScore: number) => {
-        try {
-            console.log("Submitting score: ", finalScore);
-            const response = await fetch(`${backendUrl}cardflip/submitScore`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ score: finalScore }),
-            });
-            if (response.ok) {
-                const data = await response.json();
-                if (data.newHighScore) {
-                    console.log("New Highscore!");
-                    setHighScore(finalScore);
-                    putDbHighScore(finalScore);
-                    localStorage.setItem("CardFlip", String(finalScore));
-                }
-            }
-        } catch (err) {
-            setError('Failed to submit score');
-        }
-    };
-
-
+      }
+    } catch (err) {
+      setError('Failed to submit score');
+    }
+  };
 
   const resetGame = () => {
     setIsReady(false);
@@ -291,9 +291,13 @@ const CardFlip = () => {
 
   return (
     <div>
-      <div style={{filter: `blur(${gameEnded ? "10px" : "0"})`, pointerEvents: (gameEnded ? "none" : "auto"),
-        userSelect: (gameEnded ? "none" : "auto")
-      }}>
+      <div
+        style={{
+          filter: `blur(${gameEnded ? "10px" : "0"})`,
+          pointerEvents: gameEnded ? "none" : "auto",
+          userSelect: gameEnded ? "none" : "auto",
+        }}
+      >
         <h2>Card Flip Game</h2>
 
         {error && <div style={{ color: 'red' }}>{error}</div>}
@@ -330,17 +334,19 @@ const CardFlip = () => {
         </div>
       </div>
       {gameEnded && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '10px',
-          boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
-          textAlign: 'center'
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '10px',
+            boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
+            textAlign: 'center',
+          }}
+        >
           {gameLost ? <h2>You lose</h2> : <h2>You won! 🎉🎉</h2>}
           <button onClick={() => navigate('/home')}>Back to Home</button>
         </div>

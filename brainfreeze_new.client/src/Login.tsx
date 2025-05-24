@@ -1,20 +1,19 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-
-
 const Login = () => {
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
     const [username, setUsername] = useState("");
+    const [password, setPassword] = useState(""); // Added password state
+    const [error, setError] = useState(""); // Added error state for displaying messages
     const navigate = useNavigate();
 
     useEffect(() => {
         const token = localStorage.getItem("ID");
         if (token) {
             navigate("/home");
-        }
-        else {
-            console.log("User not found returning to login");
+        } else {
+            console.log("User not found, returning to login");
         }
     }, [navigate]);
 
@@ -37,98 +36,52 @@ const Login = () => {
         }
     };
 
-    const initializeDatabaseEntry = async (): Promise<number | null> => {
+    const handleLogin = async () => {
+        if (!username.trim()) {
+            setError("Please enter a username.");
+            return;
+        }
+        if (!password.trim()) {
+            setError("Please enter a password.");
+            return;
+        }
+
         try {
-            const response = await fetch(`${backendUrl}Scoreboards`, {
+            setError(""); // Clear any previous error
+            const response = await fetch(`${backendUrl}Score/login`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    place: 0,
                     username,
-                    simonScore: 0,
-                    cardflipScore: 999999,
-                    nrgScore: 0,
+                    password,
                 }),
             });
-    
-            if (!response.ok) {
-                console.error("Error initializing database entry:", await response.text());
-                return null;
-            }
-    
-            const newUser = await response.json();
-            console.log("New user added to the database:", newUser);
-            return newUser.id;
-        } catch (error) {
-            console.error("Error initializing database entry:", error);
-            return null;
-        }
-    };
-    
-    const fetchUserScores = async () => {
-        try {
-            const response = await fetch(`${backendUrl}Scoreboards/get-by-username/${username}`);
-            
-            if (!response.ok) {
-                if (response.status === 404) {
-                    console.log("Trying to create a new user");
-                    const newUserId = await initializeDatabaseEntry();
 
-                    const user = { id: newUserId, username };
-                    if(user.id){
-                        localStorage.setItem("ID", user.id.toString());
-                        console.log(`Logged in as user ID: ${user.id}`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Login failed.");
+            }
 
-                        await fetchNewSessionId();
-                        navigate("/home");
-                        return;
-                    } else {
-                        throw new Error(`Error fetching scores: ${response.statusText}`);
-                    }
-                }
-            }
-    
-            let user = await response.json();
-            
-            if (!user || !user.id) {
-                console.log(`User not found. Creating entry for ${username}.`);
-                const newUserId = await initializeDatabaseEntry();
-    
-                if (newUserId === null) {
-                    alert("Failed to create user. Please try again.");
-                    return;
-                }
-    
-                user = { id: newUserId, username };
-            }
-    
-            localStorage.setItem("ID", user.id.toString());
-            console.log(`Logged in as user ID: ${user.id}`);
-    
+            const user = await response.json();
+            localStorage.setItem("ID", user.userId.toString());
+            localStorage.setItem("Username", user.username);
+            console.log(`Logged in as user ID: ${user.userId}`);
+
             await fetchNewSessionId();
             navigate("/home");
-    
-        } catch (error) {
-            console.error("Error fetching user scores:", error);
-            console.log("Entering offline mode");
-            localStorage.setItem("ID", "-1");
-            console.log(`Logged in as user ID: -1`);
-            navigate("/home");
+        } catch (error: any) {
+            if (error.message === "Failed to fetch") {
+                console.log("Entering offline mode");
+                localStorage.setItem("ID", "-1");
+                console.log(`Logged in as user ID: -1`);
+                navigate("/home");
+            } else {
+                setError(error.message);
+                console.error("Login error:", error);
+            }
         }
-    };
-    
-    
-    
-
-    const handleLogin = async () => {
-        if (!username.trim()) {
-            alert("Please enter a username.");
-            return;
-        }
-
-        await fetchUserScores();
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -142,7 +95,7 @@ const Login = () => {
             <div className="login-container">
                 <div className="login-box">
                     <h2>Welcome to BRAINFREEZE</h2>
-                    <p>Please enter your username to start playing.</p>
+                    <p>Please enter your username and password to start playing.</p>
                     <input
                         type="text"
                         value={username}
@@ -151,6 +104,15 @@ const Login = () => {
                         className="login-input"
                         onKeyDown={handleKeyDown}
                     />
+                    <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Enter password"
+                        className="login-input"
+                        onKeyDown={handleKeyDown}
+                    />
+                    {error && <p style={{ color: "red" }}>{error}</p>}
                     <button onClick={handleLogin} className="login-button">
                         Login
                     </button>
@@ -158,7 +120,6 @@ const Login = () => {
             </div>
         </div>
     );
-    
 };
 
 export default Login;

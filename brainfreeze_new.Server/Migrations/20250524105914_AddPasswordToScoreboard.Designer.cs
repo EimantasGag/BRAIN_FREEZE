@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using brainfreeze_new.Server.Models;
@@ -11,9 +12,11 @@ using brainfreeze_new.Server.Models;
 namespace brainfreeze_new.Server.Migrations
 {
     [DbContext(typeof(ScoreboardDBContext))]
-    partial class ScoreboardDBContextModelSnapshot : ModelSnapshot
+    [Migration("20250524105914_AddPasswordToScoreboard")]
+    partial class AddPasswordToScoreboard
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using brainfreeze_new.Server.Models;
-using brainfreeze_new.Server.Services; // Add this for AchievementService
+using brainfreeze_new.Server.Services;
 
 namespace brainfreeze_new.Server.Controllers
 {
@@ -10,14 +10,98 @@ namespace brainfreeze_new.Server.Controllers
     public class ScoreController : ControllerBase
     {
         private readonly ScoreboardDBContext _context;
-        private readonly AchievementService _achievementService; // Replace AchievementsController with AchievementService
         private readonly ILogger<ScoreController> _logger;
+        private readonly AchievementService _achievementService;
 
-        public ScoreController(ScoreboardDBContext context, AchievementService achievementService, ILogger<ScoreController> logger)
+        public ScoreController(ScoreboardDBContext context, ILogger<ScoreController> logger, AchievementService achievementService)
         {
             _context = context;
-            _achievementService = achievementService; // Update to use AchievementService
             _logger = logger;
+            _achievementService = achievementService;
+        }
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        {
+            if (string.IsNullOrEmpty(request.Username) || string.IsNullOrEmpty(request.Password))
+            {
+                return BadRequest("Username and password are required.");
+            }
+
+            try
+            {
+                var user = await _context.Scoreboards
+                    .FirstOrDefaultAsync(s => s.Username == request.Username);
+
+                if (user == null)
+                {
+                    // New user: Create a new account with the provided password
+                    user = new Scoreboard
+                    {
+                        Username = request.Username,
+                        Email = $"{request.Username}@example.com", // Placeholder email
+                        Password = PasswordService.HashPassword(request.Password),
+                        SimonScore = 0,
+                        CardflipScore = 0,
+                        NrgScore = 0
+                    };
+                    _context.Scoreboards.Add(user);
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new LoginResponse
+                    {
+                        UserId = user.Id,
+                        Username = user.Username,
+                        Message = "User created and logged in successfully."
+                    });
+                }
+                else
+                {
+                    // Existing user: Verify the password
+                    if (string.IsNullOrEmpty(user.Password))
+                    {
+                        // Handle existing users without a password (from before this update)
+                        user.Password = PasswordService.HashPassword(request.Password);
+                        await _context.SaveChangesAsync();
+
+                        return Ok(new LoginResponse
+                        {
+                            UserId = user.Id,
+                            Username = user.Username,
+                            Message = "Password set and logged in successfully."
+                        });
+                    }
+
+                    if (PasswordService.VerifyPassword(request.Password, user.Password))
+                    {
+                        return Ok(new LoginResponse
+                        {
+                            UserId = user.Id,
+                            Username = user.Username,
+                            Message = "Login successful."
+                        });
+                    }
+                    else
+                    {
+                        return Unauthorized(new { Message = "Incorrect password." });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during login for username {Username}", request.Username);
+                return StatusCode(500, "Error during login.");
+            }
+        }
+
+        [HttpGet("gamehistory/{userId}")]
+        public async Task<ActionResult<IEnumerable<GameHistory>>> GetGameHistory(int userId)
+        {
+            var gameHistory = await _context.GameHistories
+                .Where(gh => gh.UserId == userId)
+                .ToListAsync();
+
+            return Ok(gameHistory);
         }
 
         [HttpPost("evaluate")]
@@ -25,7 +109,11 @@ namespace brainfreeze_new.Server.Controllers
         {
             try
             {
+                _logger.LogInformation("EvaluateScore called: UserInput={UserInput}, Pattern={Pattern}, Difficulty={Difficulty}",
+                    string.Join(",", request.UserInput), string.Join(",", request.Pattern), request.Difficulty);
+
                 int score = CalculateScore(request.UserInput, request.Pattern, request.Difficulty);
+                _logger.LogInformation("EvaluateScore - Calculated score: {Score}", score);
 
                 if (!int.TryParse(Request.Headers["UserId"], out int userId))
                 {
@@ -44,6 +132,7 @@ namespace brainfreeze_new.Server.Controllers
                         Id = userId,
                         Username = "User" + userId,
                         Email = "unknown@example.com",
+                        Password = string.Empty, // New users via this endpoint (e.g., Simon game) may need to set a password later
                         SimonScore = 0,
                         CardflipScore = 0,
                         NrgScore = 0
@@ -77,7 +166,7 @@ namespace brainfreeze_new.Server.Controllers
 
                 await _context.SaveChangesAsync();
 
-                await _achievementService.CheckAndUpdateAchievements(userId); // Update to use AchievementService
+                await _achievementService.CheckAndUpdateAchievements(userId);
 
                 return Ok(new ScoreResponse { Score = score });
             }
@@ -93,6 +182,9 @@ namespace brainfreeze_new.Server.Controllers
         {
             try
             {
+                _logger.LogInformation("LogGameCompletion called: UserId={UserId}, GameType={GameType}, Score={Score}, IsWinner={IsWinner}",
+                    request.UserId, request.GameType, request.Score, request.IsWinner);
+
                 var scoreboard = await _context.Scoreboards.FirstOrDefaultAsync(s => s.Id == request.UserId);
                 if (scoreboard == null)
                 {
@@ -101,6 +193,7 @@ namespace brainfreeze_new.Server.Controllers
                         Id = request.UserId,
                         Username = "User" + request.UserId,
                         Email = "unknown@example.com",
+                        Password = string.Empty,
                         SimonScore = 0,
                         CardflipScore = 0,
                         NrgScore = 0
@@ -119,7 +212,7 @@ namespace brainfreeze_new.Server.Controllers
 
                 await _context.SaveChangesAsync();
 
-                await _achievementService.CheckAndUpdateAchievements(request.UserId); // Update to use AchievementService
+                await _achievementService.CheckAndUpdateAchievements(request.UserId);
 
                 return Ok(new { message = "Game completion logged" });
             }
@@ -159,12 +252,39 @@ namespace brainfreeze_new.Server.Controllers
 
             return baseScore * difficultyMultiplier;
         }
+
+        [HttpDelete("user/{username}")]
+    public async Task<IActionResult> DeleteUser(string username)
+    {
+        try
+        {
+            var user = await _context.Scoreboards
+                .FirstOrDefaultAsync(s => s.Username == username);
+
+            if (user == null)
+            {
+                return NotFound(new { Message = $"User with username {username} not found." });
+            }
+
+            _context.Scoreboards.Remove(user);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = $"User {username} deleted successfully." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting user with username {Username}", username);
+            return StatusCode(500, "Error deleting user.");
+        }
     }
+    }
+
+    
 
     public class ScoreEvaluationRequest
     {
-        public required int[] UserInput { get; set; }
-        public required int[] Pattern { get; set; }
+        public int[] UserInput { get; set; } = [];
+        public int[] Pattern { get; set; } = [];
         public DifficultyLevel Difficulty { get; set; }
     }
 
@@ -179,5 +299,18 @@ namespace brainfreeze_new.Server.Controllers
         public string GameType { get; set; } = string.Empty;
         public int Score { get; set; }
         public bool IsWinner { get; set; }
+    }
+
+    public class LoginRequest
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
+    public class LoginResponse
+    {
+        public int UserId { get; set; }
+        public string Username { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
     }
 }

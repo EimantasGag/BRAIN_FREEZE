@@ -1,15 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect,useRef} from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './NRG.css';
 import Grid from '../assets/Grid-1000-10-2-100.png';
-import backgroundMusic from '../assets/music_game_1.mp3'; // Make sure the path is correct
+import backgroundMusic from '../assets/music_game_1.mp3';
 import { useNavigate, useParams } from 'react-router-dom';
 import { WebsocketSingleton } from './websocketSingleton';
 
 interface Data {
   createdList: number[];
   level: number;
-  expectedList: number[]; 
+  expectedList: number[];
   difficulty: 'VeryEasy' | 'Easy' | 'Medium' | 'Hard' | 'Nightmare' | 'Impossible';
 }
 
@@ -21,23 +21,22 @@ function NRG() {
   const { isMultiplayer } = useParams();
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const [datas, setData] = useState<Data>();
-  const [dataString1, setDataString1] = useState<string>(''); 
-  const [dataString2, setDataString2] = useState<string>(''); 
+  const [dataString1, setDataString1] = useState<string>('');
+  const [dataString2, setDataString2] = useState<string>('');
   const [id] = useState<number | null>(Number(localStorage.getItem("ID")));
   const [highScore, setHighScore] = useState<number | null>(4);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [gameEnded, setGameEnded] = useState<boolean>(false);
   const [gameLost, setGameLost] = useState<number>(-1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
 
-  if(isMultiplayer){
+  if (isMultiplayer) {
     socketsingleton.socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === "nrg_score") {
         scoreList.push(data.score);
-      } 
-      else if(data.type === "game_end"){
+      } else if (data.type === "game_end") {
         console.log("Game ended...");
         console.log("Other players results: " + scoreList);
         setGameEnded(true);
@@ -53,135 +52,137 @@ function NRG() {
     };
   }
 
-    const sendNRGScore = () => {
-      if (isMultiplayer) {
-        console.log("Sending NRG score...: " + datas?.level);
-        socketsingleton.socket.send(JSON.stringify({ type: "nrg_score", score: datas?.level }));
-      }
-    };
-
-    const [flashingButtons, setFlashingButtons] = useState(Array(25).fill(false));
-    const buttonPositions = [
-        { top: '0.2%', left: '0%' },
-        { top: '0.2%', left: '20%' },
-        { top: '0.2%', left: '40%' },
-        { top: '0.2%', left: '60%' },
-        { top: '0.2%', left: '80%' },
-
-        { top: '20%', left: '0%' },
-        { top: '20%', left: '20%' },
-        { top: '20%', left: '40%' },
-        { top: '20%', left: '60%' },
-        { top: '20%', left: '80%' },
-
-        { top: '39.8%', left: '0%' },
-        { top: '39.8%', left: '20%' },
-        { top: '39.8%', left: '40%' },
-        { top: '39.8%', left: '60%' },
-        { top: '39.8%', left: '80%' },
-        
-        { top: '59.6%', left: '0%' },
-        { top: '59.6%', left: '20%' },
-        { top: '59.6%', left: '40%' },
-        { top: '59.6%', left: '60%' },
-        { top: '59.6%', left: '80%' },
-        
-        { top: '79.3%', left: '0%' },
-        { top: '79.3%', left: '20%' },
-        { top: '79.3%', left: '40%' },
-        { top: '79.3%', left: '60%' },
-        { top: '79.3%', left: '80%' },
-  ];
-
-    const setIdForScore = async () => {
-        try {
-            const response = await fetch(`${backendUrl}Scoreboards/get-by-id/${id}`);
-            if (!response.ok) {
-                console.log(response);
-                throw new Error(`https error! Status: ${response.status}`);
-            }
-
-            const user = await response.json();
-            setHighScore(user.nrgScore);
-            localStorage.setItem("CardFlip", user.nrgScore);
-
-        } catch (error) {
-            console.log(error);
-        }
-    };
-
-    const logGameCompletion = async (score: number, isWinner: boolean) => {
+  const sendNRGScore = () => {
+    if (isMultiplayer) {
+      console.log("Sending NRG score...: " + datas?.level);
       try {
-        const userId = id || 0;
-        const gameType = "NRG";
-        const multiplayer = isMultiplayer === "true";
-    
-        const response = await fetch(`${backendUrl}Score/log`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId,
-            gameType,
-            score,
-            isWinner: multiplayer ? isWinner : false,
-          }),
-        });
-    
-        if (!response.ok) {
-          throw new Error(`Error logging game completion: ${response.statusText}`);
+        if (socketsingleton.socket.readyState === WebSocket.OPEN) {
+          socketsingleton.socket.send(JSON.stringify({ type: "nrg_score", score: datas?.level }));
+        } else {
+          console.warn("WebSocket is not open. Current state:", socketsingleton.socket.readyState);
         }
       } catch (error) {
-        console.error('Failed to log game completion:', error);
+        console.error("Error sending NRG score via WebSocket:", error);
       }
-    };
+    }
+  };
 
-    const putDbHighScore = async (finalScore: number) => {
-        try {
-            console.log("Updating user score");
-            const fetchResponse = await fetch(`${backendUrl}Scoreboards/get-by-id/${id}`);
-            if (!fetchResponse.ok) {
-                throw new Error(`Error fetching user: ${fetchResponse.statusText}`);
-            }
+  const [flashingButtons, setFlashingButtons] = useState(Array(25).fill(false));
+  const buttonPositions = [
+    { top: '0.2%', left: '0%' },
+    { top: '0.2%', left: '20%' },
+    { top: '0.2%', left: '40%' },
+    { top: '0.2%', left: '60%' },
+    { top: '0.2%', left: '80%' },
+    { top: '20%', left: '0%' },
+    { top: '20%', left: '20%' },
+    { top: '20%', left: '40%' },
+    { top: '20%', left: '60%' },
+    { top: '20%', left: '80%' },
+    { top: '39.8%', left: '0%' },
+    { top: '39.8%', left: '20%' },
+    { top: '39.8%', left: '40%' },
+    { top: '39.8%', left: '60%' },
+    { top: '39.8%', left: '80%' },
+    { top: '59.6%', left: '0%' },
+    { top: '59.6%', left: '20%' },
+    { top: '59.6%', left: '40%' },
+    { top: '59.6%', left: '60%' },
+    { top: '59.6%', left: '80%' },
+    { top: '79.3%', left: '0%' },
+    { top: '79.3%', left: '20%' },
+    { top: '79.3%', left: '40%' },
+    { top: '79.3%', left: '60%' },
+    { top: '79.3%', left: '80%' },
+  ];
 
-            const user = await fetchResponse.json();
-            if (user) {
-                const updatedUser = { ...user, nrgScore: finalScore };
+  const setIdForScore = async () => {
+    try {
+      const response = await fetch(`${backendUrl}Scoreboards/get-by-id/${id}`);
+      if (!response.ok) {
+        console.log(response);
+        throw new Error(`https error! Status: ${response.status}`);
+      }
 
-                const putResponse = await fetch(`${backendUrl}Scoreboards/${id}`, {
-                    method: "PUT",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(updatedUser),
-                });
+      const user = await response.json();
+      setHighScore(user.nrgScore);
+      localStorage.setItem("CardFlip", user.nrgScore);
+    } catch (error) {
+      console.log(error);
+    }
+  };
 
-                if (!putResponse.ok) {
-                    throw new Error(`Error updating user: ${putResponse.statusText}`);
-                }
+  const logGameCompletion = async (score: number, isWinner: boolean) => {
+    try {
+      const userId = id || 0;
+      const gameType = "NRG";
+      const multiplayer = isMultiplayer === "true";
 
-                console.log(`User with ID ${id} updated successfully.`);
-            } else {
-                console.warn(`User with ID ${id} not found.`);
-            }
-        } catch (error) {
-            console.error("Error updating user score:", error);
+      const response = await fetch(`${backendUrl}Score/log`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          gameType,
+          score,
+          isWinner: multiplayer ? isWinner : false,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error logging game completion: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Failed to log game completion:', error);
+    }
+  };
+
+  const putDbHighScore = async (finalScore: number) => {
+    try {
+      console.log("Updating user score");
+      const fetchResponse = await fetch(`${backendUrl}Scoreboards/get-by-id/${id}`);
+      if (!fetchResponse.ok) {
+        throw new Error(`Error fetching user: ${fetchResponse.statusText}`);
+      }
+
+      const user = await fetchResponse.json();
+      if (user) {
+        const updatedUser = { ...user, nrgScore: finalScore };
+
+        const putResponse = await fetch(`${backendUrl}Scoreboards/${id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedUser),
+        });
+
+        if (!putResponse.ok) {
+          throw new Error(`Error updating user: ${putResponse.statusText}`);
         }
-    };
+
+        console.log(`User with ID ${id} updated successfully.`);
+      } else {
+        console.warn(`User with ID ${id} not found.`);
+      }
+    } catch (error) {
+      console.error("Error updating user score:", error);
+    }
+  };
 
   const fetchMuteStatus = async () => {
     try {
-        const response = await fetch(`${backendUrl}Mute`);
+      const response = await fetch(`${backendUrl}Mute`);
       if (!response.ok) {
         throw new Error(`https error! Status: ${response.status}`);
       }
 
       const data = await response.json();
       if (data.isMuted === true) {
-        setIsMuted(true); 
-      }
-      else{
+        setIsMuted(true);
+      } else {
         setIsMuted(false);
       }
     } catch (err: any) {
@@ -194,7 +195,7 @@ function NRG() {
     populateData();
     fetchMuteStatus();
 
-    const muteCheckInterval = setInterval(fetchMuteStatus, 1000); // Check every second
+    const muteCheckInterval = setInterval(fetchMuteStatus, 1000);
 
     return () => {
       clearInterval(muteCheckInterval);
@@ -203,10 +204,10 @@ function NRG() {
       }
     };
   }, []);
+
   useEffect(() => {
     handleArray();
   }, [datas?.createdList]);
-
 
   useEffect(() => {
     if (audioRef.current) {
@@ -230,19 +231,19 @@ function NRG() {
 
   const populateData = async () => {
     try {
-        console.log('Populating data');
-        const response = await fetch(`${backendUrl}NRG`); 
-        if (!response.ok) {                                               
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        const results = await response.json();
-        const data: Data = results.data;
-        console.log(results.message);
-        setData(data);
-        const dataString1 = data.createdList.join(', ');
-        setDataString1(dataString1);
+      console.log('Populating data');
+      const response = await fetch(`${backendUrl}NRG`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      const results = await response.json();
+      const data: Data = results.data;
+      console.log(results.message);
+      setData(data);
+      const dataString1 = data.createdList.join(', ');
+      setDataString1(dataString1);
     } catch (error) {
-        console.error('Failed to fetch data:', error);
+      console.error('Failed to fetch data:', error);
     }
   };
 
@@ -256,19 +257,17 @@ function NRG() {
         },
         body: JSON.stringify(data),
       });
-  
+
       if (response.ok) {
         const results = await response.json();
         const result = results.data;
         console.log(results.message);
-  
+
         if (results.message === "Loser!") {
           sendNRGScore();
           setGameEnded(true);
-          // Log game completion (loss)
           await logGameCompletion(datas?.level || 0, false);
         } else if (results.message === "Congrats player!") {
-          // Log game completion (win)
           await logGameCompletion(datas?.level || 0, true);
           if (datas?.level != null && highScore != null) {
             if (datas.level > highScore) {
@@ -276,7 +275,7 @@ function NRG() {
             }
           }
         }
-  
+
         console.log('API response:', result);
         setData(result);
         const dataString1 = result.createdList.join(', ');
@@ -290,18 +289,20 @@ function NRG() {
       console.error("Failed to fetch data", error);
     }
   }
-  
+
   const handleArray = () => {
-    if (datas && datas.level >=4) {
-      for(let i=0; i<datas.level; i++){
+    if (datas && datas.level >= 4) {
+      for (let i = 0; i < datas.level; i++) {
         flashButton(datas.createdList[i]);
       }
-      setTimeout(() => {setFlashingButtons(Array(25).fill(false));},2000);
-    } 
-    else{
+      setTimeout(() => {
+        setFlashingButtons(Array(25).fill(false));
+      }, 2000);
+    } else {
       console.error("Data is either undefined or doesn't have enough elements");
     }
-  }; 
+  };
+
   const flashButton = (index: number) => {
     setFlashingButtons((prev) => {
       const newState = [...prev];
@@ -315,80 +316,83 @@ function NRG() {
     setDataString1('');
     setDataString2('');
     setFlashingButtons(Array(25).fill(false));
-    populateData(); 
+    populateData();
   };
 
-    return (
-      <div>
-      <div className='center' style={{filter: `blur(${gameEnded ? "10px" : "0"})`, pointerEvents: (gameEnded ? "none" : "auto"),
-          userSelect: (gameEnded ? "none" : "auto")
-        }}>
-        <><div className="block" >
-              <audio ref={audioRef} src={backgroundMusic} loop />
-              <div className='image-container1'>
-              <img src={Grid} className="imageGrid"/>
+  return (
+    <div>
+      <div
+        className="center"
+        style={{
+          filter: `blur(${gameEnded ? "10px" : "0"})`,
+          pointerEvents: gameEnded ? "none" : "auto",
+          userSelect: gameEnded ? "none" : "auto",
+        }}
+      >
+        <>
+          <div className="block">
+            <audio ref={audioRef} src={backgroundMusic} loop />
+            <div className="image-container1">
+              <img src={Grid} className="imageGrid" />
               {buttonPositions.map((pos, index) => (
-            <button
+                <button
                   key={index}
                   className={`grid-block ${flashingButtons[index] ? 'activated' : ''}`}
                   style={{ top: pos.top, left: pos.left, width: '100px', height: '100px' }}
                   onClick={() => {
-                      flashButton(index);
-                      if (datas) {
-                        const updatedData = {
-                            ...datas,
-                            expectedList: Array.isArray(datas.expectedList) ? [...datas.expectedList, index] : [index],
-                        };
-                        setData(updatedData);
-                        const dataString2 = updatedData.expectedList.join(', ');
-                        setDataString2(dataString2);
-                        if(updatedData.createdList.length==updatedData.expectedList.length){
-                          setFlashingButtons(Array(25).fill(false));
-                          postData(updatedData);
-              
-                        }
+                    flashButton(index);
+                    if (datas) {
+                      const updatedData = {
+                        ...datas,
+                        expectedList: Array.isArray(datas.expectedList) ? [...datas.expectedList, index] : [index],
+                      };
+                      setData(updatedData);
+                      const dataString2 = updatedData.expectedList.join(', ');
+                      setDataString2(dataString2);
+                      if (updatedData.createdList.length === updatedData.expectedList.length) {
+                        setFlashingButtons(Array(25).fill(false));
+                        postData(updatedData);
                       }
+                    }
                   }}
-            >
-            {datas && datas.createdList.includes(index)? datas.createdList.indexOf(index) + 1 : ''}
-            </button>
-          ))}
-          <div className="level-text">Level: {datas?.level ?? defaultLevel}</div>
-            {!isMultiplayer && (
-            <>
-              <div>{dataString1}</div>
-              <div>{dataString2}</div>
-              <button onClick={handleArray}></button>
-              <div 
-                className="restart-button" 
-                onClick={restartGame} 
-                role="button" 
-                aria-label="Restart Game"
-              />
-              <div >(index starts from zero)</div>
-            </>
-            )}
-          </div>
+                >
+                  {datas && datas.createdList.includes(index) ? datas.createdList.indexOf(index) + 1 : ''}
+                </button>
+              ))}
+              <div className="level-text">Level: {datas?.level ?? defaultLevel}</div>
+              {!isMultiplayer && (
+                <>
+                  <div>{dataString1}</div>
+                  <div>{dataString2}</div>
+                  <button onClick={handleArray}></button>
+                  <div className="restart-button" onClick={restartGame} role="button" aria-label="Restart Game" />
+                  <div>(index starts from zero)</div>
+                </>
+              )}
+            </div>
           </div>
         </>
       </div>
       {gameEnded && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '10px',
-          boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
-          textAlign: 'center'
-        }}>
-          {gameLost == -1 ? <h2>Waiting for other players...</h2> : (gameLost == 0 ? <h2>You won! 🎉🎉</h2> : <h2>You lost</h2>)}
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '10px',
+            boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
+            textAlign: 'center',
+          }}
+        >
+          {gameLost === -1 ? <h2>Waiting for other players...</h2> : gameLost === 0 ? <h2>You won! 🎉🎉</h2> : <h2>You lost</h2>}
           <button onClick={() => navigate('/home')}>Back to Home</button>
         </div>
       )}
-      </div>
-    );
-  }
+    </div>
+  );
+}
+
 export default NRG;
